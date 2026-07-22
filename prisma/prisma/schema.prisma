@@ -1,0 +1,156 @@
+// سيد الحقيقة — Lord of the Truth
+// Prisma schema (SQLite)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Chapter {
+  id            Int       @id @default(autoincrement())
+  number        Float     @unique
+  title         String
+  content       String
+  wordCount     Int       @default(0)
+  views         Int       @default(0)
+  coverImageUrl String?
+  sourceUrl     String?
+  recap         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  comments      Comment[]
+  chapterCharacters ChapterCharacter[]
+
+  @@index([number])
+}
+
+model Character {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  nameEn      String?
+  description String?
+  imageUrl    String?
+  color       String?
+  isMain      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  relationsFrom CharacterRelation[] @relation("relationsFrom")
+  relationsTo   CharacterRelation[] @relation("relationsTo")
+  appearances  ChapterCharacter[]
+}
+
+model ChapterCharacter {
+  id           Int      @id @default(autoincrement())
+  chapterId    Int
+  chapter      Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  characterId  Int
+  character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  paragraphIndex Int    // Which paragraph (0-based)
+  wordIndex    Int      // Character index within the paragraph text
+  createdAt    DateTime @default(now())
+
+  @@unique([chapterId, characterId, paragraphIndex])
+  @@index([chapterId])
+  @@index([characterId])
+}
+
+model CharacterRelation {
+  id           Int      @id @default(autoincrement())
+  fromId       Int
+  from         Character @relation("relationsFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId         Int
+  to           Character @relation("relationsTo", fields: [toId], references: [id], onDelete: Cascade)
+  type         String   // أب/صديق/عدو/معلم/تلميذ/عائلة/حليف
+  description  String?
+}
+
+model Location {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  imageUrl    String?
+  posX        Float    @default(50)  // 0-100 percentage on map
+  posY        Float    @default(50)
+  startChapter Int     @default(1)
+  endChapter  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Comment {
+  id          Int      @id @default(autoincrement())
+  chapterId   Int
+  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  author      String
+  content     String
+  wordAnchor  String?
+  createdAt   DateTime @default(now())
+  // WordPress import fields
+  wpCommentId Int?     @unique
+  parentId    Int?     // WP comment ID of parent (for replies)
+  wpDate      DateTime?
+  avatarUrl   String?
+  isReply     Boolean  @default(false)
+
+  @@index([chapterId])
+  @@index([wpCommentId])
+}
+
+// Singleton row (id = 1)
+model SiteSettings {
+  id               Int     @id @default(1)
+  coverImageUrl    String?
+  novelTitle       String?
+  novelTitleEn     String?
+  novelDescription String?
+}
+
+// ===== Interactive Mode models =====
+
+model User {
+  id         String        @id @default(uuid())
+  nickname   String
+  createdAt  DateTime      @default(now())
+  coins      Int           @default(0)
+  ownedWords OwnedWord[]
+  sessions   ActiveSession[]
+}
+
+model OwnedWord {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapterId  Int
+  wordIndex  Int
+  wordText   String
+  tier       Int
+  color      String?
+  styleId    String?
+  createdAt  DateTime @default(now())
+
+  @@unique([chapterId, wordIndex])
+  @@index([chapterId])
+}
+
+model ActiveSession {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapterId  Int
+  lastSeen   DateTime @default(now())
+
+  @@index([chapterId])
+}
+
+model DailyWordClaim {
+  id         String   @id @default(uuid())
+  userId     String
+  chapterId  Int
+  claimedAt  DateTime @default(now())
+
+  @@unique([userId, chapterId])
+}
